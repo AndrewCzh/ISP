@@ -30,6 +30,15 @@ def is_valid_filename(filename):
         return False
 """
 
+def is_valid_filename(filename):
+	status = True
+	for i in range(len(filename)):
+		if filename[i].isalnum() or filename[i] == '-' or filename[i] == '_' or filename[i] == '.':
+			pass
+		else:
+			status = False
+	return status
+
 # check whether a file is valid (start with 'S' and end with 'E')		
 def check_status(file):
 	filecontent = file.readat(None, 0)
@@ -45,8 +54,8 @@ class ABFile():
 			return 
 		file = filename.rsplit('.', 1)
 		# check if the filename is valid
-		# if is_valid_filename(file[0]):
-		if file[0].islower():
+		if is_valid_filename(file[0]):
+		# if file[0].islower():
 			# globals
 			mycontext['debug'] = False   
 			# local (per object) reference to the underlying file

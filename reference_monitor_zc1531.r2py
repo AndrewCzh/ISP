@@ -6,121 +6,120 @@ This security layer inadequately handles A/B storage for files in RepyV2.
 Note:
     This security layer uses encasementlib.r2py, restrictions.default, repy.py and Python
     Also you need to give it an application to run.
-    python repy.py restrictions.default encasementlib.r2py [security_layer].r2py [attack_program].r2py
+    python repy.py restrictions.default encasementlib.r2py [security_layer].r2py [attack_program].r2py 
+    
+""" 
 
-    """
+# import re
+TYPE="type"
+ARGS="args"
+RETURN="return"
+EXCP="exceptions"
+TARGET="target"
+FUNC="func"
+OBJC="objc"
 
-import re
-
-TYPE = "type"
-ARGS = "args"
-RETURN = "return"
-EXCP = "exceptions"
-TARGET = "target"
-FUNC = "func"
-OBJC = "objc"
-
-
-# check whether a filename is valid (only contains lowercase alphas,
+# check whether a filename is valid (only contains lowercase alphas, 
 # numbers, hyphen, period, and underscore
+"""
 def is_valid_filename(filename):
     pattern = r'^[a-z0-9_.-]+$'
     if re.match(pattern, filename):
         return True
     else:
         return False
+"""
 
-
-# check whether a file is valid (start with 'S' and end with 'E')
+# check whether a file is valid (start with 'S' and end with 'E')		
 def check_status(file):
-    filecontent = file.readat(None, 0)
-    f_ch = filecontent[0]
-    l_ch = filecontent[-1]
-    if f_ch == 'S' and l_ch == 'E':
-        return True
-    else:
-        return False
-
+	filecontent = file.readat(None, 0)
+	if filecontent.startswith('S') and filecontent.endswith('E'):
+		return True
+	else:
+		return False
 
 class ABFile():
-    def __init__(self, filename, create):
-        # filename's length needs to be less than 120
-        if len(filename) >= 120:
-            return
-        file = filename.rsplit('.', 1)
-        # check if the filename is valid
-        if is_valid_filename(file[0]):
-            # globals
-            mycontext['debug'] = False
-            # local (per object) reference to the underlying file
-            self.Afn = filename + '.a'
-            self.Bfn = filename + '.b'
-            # make the files and add 'SE' to the readat file...
-            if create:
-                self.Afile = openfile(self.Afn, create)
-                self.Bfile = openfile(self.Bfn, create)
-                self.Afile.writeat('SE', 0)
-            else:
-                self.Afile = openfile(self.Afn, False)
-                self.Bfile = openfile(self.Bfn, False)
-            # create filelock for both Afile and Bfile
-            self.Afile.filelock = createlock()
-            self.Bfile.filelock = createlock()
+	def __init__(self,filename,create):
+		# filename's length needs to be less than 120
+		if len(filename) >= 120:
+			return 
+		file = filename.rsplit('.', 1)
+		# check if the filename is valid
+		# if is_valid_filename(file[0]):
+		if file[0].islower():
+			# globals
+			mycontext['debug'] = False   
+			# local (per object) reference to the underlying file
+			self.Afn = filename+'.a'
+			self.Bfn = filename+'.b'
+			# make the files and add 'SE' to the readat file...
+			if create:
+				self.Afile = openfile(self.Afn,create)
+				self.Bfile = openfile(self.Bfn,create)
+				if not check_status(self.Afile):
+					self.Afile.writeat('SE',0)
+			else:
+				self.Afile = openfile(self.Afn, False)
+				self.Bfile = openfile(self.Bfn, False)
+			# create filelock for both Afile and Bfile
+			self.Afile.filelock = createlock()
+			self.Bfile.filelock = createlock()
 
-    def writeat(self, data, offset):
-        # acquire the lock to write
-        # Write the requested data to the B file using the sandbox's writeat call
-        # release the lock after used
-        self.Bfile.filelock.acquire(True)
-        self.Bfile.writeat(data, offset)
-        self.Bfile.filelock.release()
 
-    def readat(self, bytes, offset):
-        # acquire the lock to read
-        # Read from the A file using the sandbox's readat...
-        # release lock after used
-        self.Afile.filelock.acquire(True)
-        Afile_data = self.Afile.readat(bytes, offset)
-        self.Afile.filelock.release()
-        return Afile_data
+	def writeat(self,data,offset):
+ 		# acquire the lock to write
+ 		# Write the requested data to the B file using the sandbox's writeat call
+		# release the lock after used
+		self.Bfile.filelock.acquire(True)
+		self.Bfile.writeat(data,offset)
+		self.Bfile.filelock.release()
+	  
+	def readat(self,bytes,offset):
+		# acquire the lock to read
+		# Read from the A file using the sandbox's readat...
+		# release lock after used
+		self.Afile.filelock.acquire(True)
+		Afile_data = self.Afile.readat(bytes, offset)
+		self.Afile.filelock.release()
+		return Afile_data
 
-    def close(self):
-        # acquire the locks for both files
-        self.Afile.filelock.acquire(True)
-        self.Bfile.filelock.acquire(True)
-        # check if Afile and Bfile is safe
-        # if both files are safe, write Bfile into Afile
-        # else write Afile into Bfile
-        if check_status(self.Afile) and check_status(self.Bfile):
-            replace_buf = self.Bfile.readat(None, 0)
-            self.Afile.writeat(replace_buf, 0)
-        else:
-            replace_buf = self.Afile.readat(None, 0)
-            self.Bfile.writeat(replace_buf, 0)
-        # release the locks and close the file
-        self.Afile.close()
-        self.Bfile.close()
-        self.Afile.filelock.release()
-        self.Bfile.filelock.release()
+	def close(self):
+		# acquire the locks for both files
+		self.Afile.filelock.acquire(True)
+		self.Bfile.filelock.acquire(True)
+		# check if Afile and Bfile is safe
+		# if both files are safe, write Bfile into Afile
+		# else write Afile into Bfile
+		if check_status(self.Afile) and check_status(self.Bfile):
+			replace_buf = self.Bfile.readat(None, 0)
+			self.Afile.writeat(replace_buf, 0)
+		else:
+			replace_buf = self.Afile.readat(None, 0)
+			self.Bfile.writeat(replace_buf, 0)
+		# release the locks and close the file
+		self.Afile.close()
+		self.Bfile.close()
+		self.Afile.filelock.release()
+		self.Bfile.filelock.release()
+		
+
 
 def ABopenfile(filename, create):
-    return ABFile(filename, create)
+	return ABFile(filename,create)
+
+
 
 
 # The code here sets up type checking and variable hiding for you.  You
 # should not need to change anything below here.
-sec_file_def = {"obj-type": ABFile,
-                "name": "ABFile",
-                "writeat": {"type": "func", "args": (str, int), "exceptions": Exception, "return": (int, type(None)),
-                            "target": ABFile.writeat},
-                "readat": {"type": "func", "args": ((int, type(None)), (int)), "exceptions": Exception, "return": str,
-                           "target": ABFile.readat},
-                "close": {"type": "func", "args": None, "exceptions": None, "return": (bool, type(None)),
-                          "target": ABFile.close}
-                }
+sec_file_def = {"obj-type":ABFile,
+                "name":"ABFile",
+                "writeat":{"type":"func","args":(str,int),"exceptions":Exception,"return":(int,type(None)),"target":ABFile.writeat},
+                "readat":{"type":"func","args":((int,type(None)),(int)),"exceptions":Exception,"return":str,"target":ABFile.readat},
+                "close":{"type":"func","args":None,"exceptions":None,"return":(bool,type(None)),"target":ABFile.close}
+           }
 
-CHILD_CONTEXT_DEF["ABopenfile"] = {TYPE: OBJC, ARGS: (str, bool), EXCP: Exception, RETURN: sec_file_def,
-                                   TARGET: ABopenfile}
+CHILD_CONTEXT_DEF["ABopenfile"] = {TYPE:OBJC,ARGS:(str,bool),EXCP:Exception,RETURN:sec_file_def,TARGET:ABopenfile}
 
 # Execute the user code
 secure_dispatch_module()

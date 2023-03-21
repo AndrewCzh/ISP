@@ -30,6 +30,8 @@ def is_valid_filename(filename):
         return False
 """
 
+# check whether the filename is valid
+# only contains lowercase alphabet, numbers, hyphen, period, and underscore
 def is_valid_filename(filename):
 	status = True
 	for i in range(len(filename)):
@@ -39,7 +41,7 @@ def is_valid_filename(filename):
 			status = False
 	return status
 
-# check whether a file is valid (start with 'S' and end with 'E')		
+# check whether a file is valid (start with 'S' and end with 'E')
 def check_status(file):
 	filecontent = file.readat(None, 0)
 	if filecontent.startswith('S') and filecontent.endswith('E'):
@@ -51,13 +53,13 @@ class ABFile():
 	def __init__(self,filename,create):
 		# filename's length needs to be less than 120
 		if len(filename) >= 120:
-			return 
+			return
 		file = filename.rsplit('.', 1)
 		# check if the filename is valid
 		if is_valid_filename(file[0]):
 		# if file[0].islower():
 			# globals
-			mycontext['debug'] = False   
+			mycontext['debug'] = False
 			# local (per object) reference to the underlying file
 			self.Afn = filename+'.a'
 			self.Bfn = filename+'.b'
@@ -66,7 +68,7 @@ class ABFile():
 				self.Afile = openfile(self.Afn,create)
 				self.Bfile = openfile(self.Bfn,create)
 				if not check_status(self.Afile):
-					self.Afile.writeat('SE',0)
+				    self.Afile.writeat('SE',0)
 			else:
 				self.Afile = openfile(self.Afn, False)
 				self.Bfile = openfile(self.Bfn, False)
@@ -74,19 +76,18 @@ class ABFile():
 			self.Afile.filelock = createlock()
 			self.Bfile.filelock = createlock()
 
-
+    # acquire the lock to write
+    # Write the requested data to the B file using the sandbox's writeat call
+    # release the lock after used
 	def writeat(self,data,offset):
- 		# acquire the lock to write
- 		# Write the requested data to the B file using the sandbox's writeat call
-		# release the lock after used
 		self.Bfile.filelock.acquire(True)
 		self.Bfile.writeat(data,offset)
 		self.Bfile.filelock.release()
-	  
+
+    # acquire the lock to read
+    # Read from the A file using the sandbox's readat...
+    # release lock after used
 	def readat(self,bytes,offset):
-		# acquire the lock to read
-		# Read from the A file using the sandbox's readat...
-		# release lock after used
 		self.Afile.filelock.acquire(True)
 		Afile_data = self.Afile.readat(bytes, offset)
 		self.Afile.filelock.release()
@@ -103,14 +104,15 @@ class ABFile():
 			replace_buf = self.Bfile.readat(None, 0)
 			self.Afile.writeat(replace_buf, 0)
 		else:
+			# rollback Bfile context to Afile
 			replace_buf = self.Afile.readat(None, 0)
 			self.Bfile.writeat(replace_buf, 0)
 		# release the locks and close the file
-		self.Afile.close()
-		self.Bfile.close()
 		self.Afile.filelock.release()
 		self.Bfile.filelock.release()
-		
+		self.Afile.close()
+		self.Bfile.close()
+
 
 
 def ABopenfile(filename, create):
